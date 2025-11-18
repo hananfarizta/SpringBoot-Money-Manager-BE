@@ -7,12 +7,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,27 +34,6 @@ public class GlobalException {
                 "Request body cannot be empty or is invalid JSON",
                 null);
         return ResponseEntity.badRequest().body(response);
-    }
-
-    /**
-     * 405 Method Not Allowed
-     */
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ApiResponseDTO<Object>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
-        var supportedMethods = ex.getSupportedHttpMethods();
-        String message = String.format(
-                "Method %s is not supported for this endpoint. Supported methods are %s",
-                ex.getMethod(),
-                supportedMethods != null
-                        ? String.join(", ", supportedMethods.stream().map(HttpMethod::name).toList())
-                        : "NONE");
-
-        ApiResponseDTO<Object> response = new ApiResponseDTO<>(
-                "error",
-                message,
-                null);
-
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
     }
 
     /**
@@ -90,6 +71,79 @@ public class GlobalException {
                 ex.getMessage(),
                 null);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * 400 Bad Request
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponseDTO<Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+
+        String paramName = ex.getName();
+        Object invalidValue = ex.getValue();
+
+        String message = String.format(
+                "Invalid value '%s' for parameter",
+                invalidValue,
+                paramName);
+
+        ApiResponseDTO<Object> response = new ApiResponseDTO<>(
+                "error",
+                message,
+                null);
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * 401 Unauthorized
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponseDTO<Object>> handleUnauthorized(
+            AuthenticationException ex) {
+
+        ApiResponseDTO<Object> response = new ApiResponseDTO<>(
+                "error",
+                "Unauthorized: " + ex.getMessage(),
+                null);
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    /**
+     * 404 Not Found - Endpoint not exists
+     */
+    @ExceptionHandler(org.springframework.web.servlet.NoHandlerFoundException.class)
+    public ResponseEntity<ApiResponseDTO<Object>> handleNotFound(
+            org.springframework.web.servlet.NoHandlerFoundException ex) {
+
+        ApiResponseDTO<Object> response = new ApiResponseDTO<>(
+                "error",
+                "Endpoint not found: " + ex.getRequestURL(),
+                null);
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    /**
+     * 405 Method Not Allowed
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponseDTO<Object>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        var supportedMethods = ex.getSupportedHttpMethods();
+        String message = String.format(
+                "Method %s is not supported for this endpoint. Supported methods are %s",
+                ex.getMethod(),
+                supportedMethods != null
+                        ? String.join(", ", supportedMethods.stream().map(HttpMethod::name).toList())
+                        : "NONE");
+
+        ApiResponseDTO<Object> response = new ApiResponseDTO<>(
+                "error",
+                message,
+                null);
+
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
     }
 
     /**
