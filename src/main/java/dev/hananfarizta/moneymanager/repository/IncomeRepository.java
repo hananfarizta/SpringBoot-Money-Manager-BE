@@ -33,4 +33,11 @@ public interface IncomeRepository extends JpaRepository<IncomeEntity, Long>{
 
     // select * from tbl_incomes where profile_id = ?1 and date between ?2 and ?3
     List<IncomeEntity> findByProfileIdAndDateBetween(Long profileId, LocalDate startDate, LocalDate endDate);
+
+
+    // select * from tbl_incomes where profile_id = ?1 and date = ?2
+    List<IncomeEntity> findByProfileIdAndDate(Long profileId, LocalDate date);
+
+    @Query("SELECT SUM(i.amount) FROM IncomeEntity i WHERE i.profile.id = :profileId AND DATE(i.date) = CURRENT_DATE")
+    BigDecimal findTodayIncome(Long profileId);
 }

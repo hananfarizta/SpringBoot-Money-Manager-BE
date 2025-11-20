@@ -85,7 +85,7 @@ public class ExpenseService {
                 .name(expenseEntity.getName())
                 .icon(expenseEntity.getIcon())
                 .categoryId(expenseEntity.getCategory() != null ? expenseEntity.getCategory().getId() : null)
-                .categoryname(expenseEntity.getCategory() != null ? expenseEntity.getCategory().getName() : "N/A")
+                .categoryName(expenseEntity.getCategory() != null ? expenseEntity.getCategory().getName() : "N/A")
                 .amount(expenseEntity.getAmount())
                 .date(expenseEntity.getDate())
                 .createdAt(expenseEntity.getCreatedAt())
@@ -197,5 +197,11 @@ public class ExpenseService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to filter expenses", e);
         }
+    }
+
+    // Notification
+    public List<ExpenseDTO> getExpensesForUserOnDate(Long profileId, LocalDate date) {
+        List<ExpenseEntity> list = expenseRepository.findByProfileIdAndDate(profileId, date);
+        return list.stream().map(this::toDTO).toList();
     }
 }
