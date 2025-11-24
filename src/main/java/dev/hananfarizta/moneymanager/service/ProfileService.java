@@ -6,6 +6,8 @@ import dev.hananfarizta.moneymanager.entity.ProfileEntity;
 import dev.hananfarizta.moneymanager.repository.ProfileRepository;
 import dev.hananfarizta.moneymanager.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,6 +32,9 @@ public class ProfileService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
 
+    @Value("${app.activation.url}")
+    private String appActivationUrl;
+
     public Map<String, Object> registerProfile(ProfileDTO profileDTO) {
         try {
 
@@ -40,7 +45,7 @@ public class ProfileService {
             newProfile.setActivationToken(UUID.randomUUID().toString());
             newProfile = profileRepository.save(newProfile);
 
-            String activationLink = "http://localhost:8080/api/v1.0/activate?token=" + newProfile.getActivationToken();
+            String activationLink = appActivationUrl + "/api/v1.0/activate?token=" + newProfile.getActivationToken();
             emailService.sendEmail(
                     newProfile.getEmail(),
                     "Activate Your Account",
