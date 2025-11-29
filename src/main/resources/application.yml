@@ -6,7 +6,7 @@ spring:
     import: optional:.env[.properties]
 
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
+    active: ${SPRING_PROFILES_ACTIVE}
     group:
       local: [local]
       prod: [prod]
@@ -43,7 +43,7 @@ spring:
 server:
   servlet:
     context-path: /api/v1.0
-  port: 8080
+  port: ${PORT:8080}
 
 jwt:
   secret: ${JWT_SECRET}
