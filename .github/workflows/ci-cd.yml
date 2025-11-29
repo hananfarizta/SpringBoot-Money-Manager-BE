@@ -63,13 +63,18 @@ jobs:
 
       - name: Docker build & tag
         run: |
+          OWNER_LOWER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" | tr '[:upper:]' '[:lower:]')"  # ambil nama repo lalu lowercase
           BRANCH="${GITHUB_REF##*/}"
+
           if [ "$BRANCH" = "dev" ]; then
-            IMAGE="${{ env.IMAGE_NAME_DEV }}"
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-dev"
           else
-            IMAGE="${{ env.IMAGE_NAME_MAIN }}"
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-prod"
           fi
+
           docker build -t "$IMAGE:latest" .
+          echo "Built image: $IMAGE:latest"
 
       - name: Log in to GHCR
         if: ${{ github.event_name != 'pull_request' && env.PUSH_TO_GHCR == 'true' }}
@@ -82,12 +87,16 @@ jobs:
       - name: Push image to GHCR
         if: ${{ github.event_name != 'pull_request' && env.PUSH_TO_GHCR == 'true' }}
         run: |
+          OWNER_LOWER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" | tr '[:upper:]' '[:lower:]')"
           BRANCH="${GITHUB_REF##*/}"
+
           if [ "$BRANCH" = "dev" ]; then
-            IMAGE="${{ env.IMAGE_NAME_DEV }}"
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-dev"
           else
-            IMAGE="${{ env.IMAGE_NAME_MAIN }}"
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-prod"
           fi
+
           docker push "$IMAGE:latest"
 
       - name: Show local images
