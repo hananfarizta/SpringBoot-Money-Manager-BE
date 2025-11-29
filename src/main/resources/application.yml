@@ -10,6 +10,7 @@ spring:
     group:
       local: [local]
       prod: [prod]
+      test: [test]
 
   jpa:
     hibernate:
