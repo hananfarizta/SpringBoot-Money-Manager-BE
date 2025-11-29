@@ -40,38 +40,6 @@ jobs:
           name: moneymanager-jar-${{ github.ref_name }}
           path: target/*.jar
 
-      - name: Check JaCoCo HTML report presence
-        id: check_jacoco_html
-        run: |
-          if [ -d "target/site/jacoco" ]; then
-            echo "has_html=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_html=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Upload JaCoCo HTML report
-        if: steps.check_jacoco_html.outputs.has_html == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: jacoco-report-html-${{ github.ref_name }}
-          path: target/site/jacoco/*
-
-      - name: Check JaCoCo XML report presence
-        id: check_jacoco_xml
-        run: |
-          if [ -f "target/site/jacoco/jacoco.xml" ]; then
-            echo "has_xml=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_xml=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Upload JaCoCo XML report
-        if: steps.check_jacoco_xml.outputs.has_xml == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: jacoco-report-xml-${{ github.ref_name }}
-          path: target/site/jacoco/jacoco.xml
-
   # =========================
   # CD: Build Docker image (no tests) + optional push to GHCR
   # =========================
