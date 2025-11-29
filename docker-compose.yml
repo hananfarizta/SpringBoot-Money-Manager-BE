@@ -1,35 +1,49 @@
-version: '3.8'
+version: "3.9"
 
 services:
-  app:
-    build: .
-    container_name: moneymanager
-    ports:
-      - "8080:8080"
-    depends_on:
-      - db
-    env_file:
-      - .env
+  db:
+    image: postgres:16-alpine
+    container_name: moneymanager-db
     environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      POSTGRES_DB: moneymanager
+      POSTGRES_USER: ${POSTGRES_USERNAME_LOCAL}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_LOCAL}
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d moneymanager"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moneymanager-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL_LOCAL}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USERNAME_LOCAL}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_LOCAL}
+
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_MAIL_FROM: ${SMTP_MAIL_FROM}
+
       JWT_SECRET: ${JWT_SECRET}
       FRONTEND_URL: ${FRONTEND_URL}
-
-  db:
-    image: mysql:8.3
-    container_name: mysql_db
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: moneymanager
+      APP_ACTIVATION_URL: ${APP_ACTIVATION_URL}
     ports:
-      - "3307:3306"
-    volumes:
-      - mysqldata:/var/lib/mysql
+      - "8080:8080"
+    restart: unless-stopped
 
 volumes:
-  mysqldata:
+  db_data:

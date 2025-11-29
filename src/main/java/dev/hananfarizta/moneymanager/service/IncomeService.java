@@ -1,20 +1,19 @@
 package dev.hananfarizta.moneymanager.service;
 
-import dev.hananfarizta.moneymanager.dto.IncomeDTO;
-import dev.hananfarizta.moneymanager.entity.CategoryEntity;
-import dev.hananfarizta.moneymanager.entity.IncomeEntity;
-import dev.hananfarizta.moneymanager.entity.ProfileEntity;
-import dev.hananfarizta.moneymanager.repository.CategoryRepository;
-import dev.hananfarizta.moneymanager.repository.IncomeRepository;
-
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Service;
+import dev.hananfarizta.moneymanager.dto.IncomeDTO;
+import dev.hananfarizta.moneymanager.entity.CategoryEntity;
+import dev.hananfarizta.moneymanager.entity.IncomeEntity;
+import dev.hananfarizta.moneymanager.entity.ProfileEntity;
+import dev.hananfarizta.moneymanager.repository.CategoryRepository;
+import dev.hananfarizta.moneymanager.repository.IncomeRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -104,8 +103,7 @@ public class IncomeService {
             LocalDate endDate = now.withDayOfMonth(now.lengthOfMonth());
 
             List<IncomeDTO> incomeDTOs = incomeRepository
-                    .findByProfileIdAndDateBetween(profileEntity.getId(),
-                            startDate, endDate)
+                    .findByProfileIdAndDateBetween(profileEntity.getId(), startDate, endDate)
                     .stream()
                     .map(this::toDTO)
                     .toList();
@@ -126,8 +124,7 @@ public class IncomeService {
         try {
             ProfileEntity profileEntity = profileService.getCurrentProfile();
 
-            IncomeEntity incomeEntity = incomeRepository.findById(
-                    incomeId)
+            IncomeEntity incomeEntity = incomeRepository.findById(incomeId)
                     .orElseThrow(() -> new IllegalArgumentException("Income not found"));
 
             if (!incomeEntity.getProfile().getId().equals(profileEntity.getId())) {
@@ -147,7 +144,6 @@ public class IncomeService {
     public Map<String, Object> getLatestFiveIncomesForCurrentUser() {
         try {
             ProfileEntity profileEntity = profileService.getCurrentProfile();
-
             List<IncomeDTO> incomeDTOs = incomeRepository
                     .findTop5ByProfileIdOrderByDateDesc(profileEntity.getId())
                     .stream()
@@ -186,23 +182,31 @@ public class IncomeService {
 
             List<IncomeDTO> incomeDTOs = incomeRepository
                     .findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(
-                            profileEntity.getId(),
-                            startDate,
-                            endDate,
-                            keyword,
-                            sort)
+                            profileEntity.getId(), startDate, endDate, keyword, sort)
                     .stream()
                     .map(this::toDTO)
                     .toList();
 
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("incomes", incomeDTOs);
-            
+
             return data;
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
             throw new RuntimeException("Failed to filter incomes", e);
         }
+    }
+
+    // NEW: total incomes for "today" current user (LocalDate range)
+    public BigDecimal getTodayIncomeForCurrentUser() {
+        ProfileEntity profileEntity = profileService.getCurrentProfile();
+        LocalDate today = LocalDate.now(); // atau LocalDate.now(ZoneId.of("Asia/Jakarta")) jika perlu
+
+        BigDecimal sum = incomeRepository.findIncomeSumBetweenDates(
+                profileEntity.getId(),
+                today,
+                today);
+        return sum != null ? sum : BigDecimal.ZERO;
     }
 }

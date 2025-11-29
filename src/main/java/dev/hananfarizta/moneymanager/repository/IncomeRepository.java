@@ -19,7 +19,7 @@ public interface IncomeRepository extends JpaRepository<IncomeEntity, Long>{
     // select * from tbl_incomes where profileId = ?1 order by date desc limit 5
     List<IncomeEntity> findTop5ByProfileIdOrderByDateDesc(Long profileId);
 
-    @Query("SELECT SUM(i.amount) FROM IncomeEntity i WHERE i.profile.id = :profileId")
+    @Query("SELECT COALESCE(SUM(i.amount), 0) FROM IncomeEntity i WHERE i.profile.id = :profileId")
     BigDecimal findTotalIncomeByProfileId(@Param("profileId") Long profileId);
 
     // select * from tbl_incomes where profile_id = ?1 and date between ?2 and ?3
@@ -38,6 +38,10 @@ public interface IncomeRepository extends JpaRepository<IncomeEntity, Long>{
     // select * from tbl_incomes where profile_id = ?1 and date = ?2
     List<IncomeEntity> findByProfileIdAndDate(Long profileId, LocalDate date);
 
-    @Query("SELECT SUM(i.amount) FROM IncomeEntity i WHERE i.profile.id = :profileId AND DATE(i.date) = CURRENT_DATE")
-    BigDecimal findTodayIncome(Long profileId);
+    // NEW: sum incomes between two LocalDate boundaries (inclusive)
+    @Query("SELECT COALESCE(SUM(i.amount), 0) FROM IncomeEntity i WHERE i.profile.id = :profileId AND i.date >= :startDate AND i.date <= :endDate")
+    BigDecimal findIncomeSumBetweenDates(
+            @Param("profileId") Long profileId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

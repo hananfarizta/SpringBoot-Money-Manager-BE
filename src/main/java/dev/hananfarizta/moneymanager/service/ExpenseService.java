@@ -103,8 +103,7 @@ public class ExpenseService {
             LocalDate endDate = now.withDayOfMonth(now.lengthOfMonth());
 
             List<ExpenseDTO> expenseDTOs = expenseRepository
-                    .findByProfileIdAndDateBetween(profileEntity.getId(),
-                            startDate, endDate)
+                    .findByProfileIdAndDateBetween(profileEntity.getId(), startDate, endDate)
                     .stream()
                     .map(this::toDTO)
                     .toList();
@@ -167,7 +166,7 @@ public class ExpenseService {
         try {
             ProfileEntity profileEntity = profileService.getCurrentProfile();
             BigDecimal totalExpenses = expenseRepository.findTotalExpenseByProfileId(profileEntity.getId());
-
+            
             return totalExpenses != null ? totalExpenses : BigDecimal.ZERO;
         } catch (IllegalArgumentException e) {
             throw e;
@@ -182,8 +181,8 @@ public class ExpenseService {
             ProfileEntity profileEntity = profileService.getCurrentProfile();
 
             List<ExpenseDTO> expenseDTOs = expenseRepository
-                    .findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(profileEntity.getId(), startDate, endDate,
-                            keyword, sort)
+                    .findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(
+                            profileEntity.getId(), startDate, endDate, keyword, sort)
                     .stream()
                     .map(this::toDTO)
                     .toList();
@@ -199,9 +198,20 @@ public class ExpenseService {
         }
     }
 
-    // Notification
     public List<ExpenseDTO> getExpensesForUserOnDate(Long profileId, LocalDate date) {
         List<ExpenseEntity> list = expenseRepository.findByProfileIdAndDate(profileId, date);
         return list.stream().map(this::toDTO).toList();
+    }
+
+    // NEW: total expense for "today" current user (LocalDate range)
+    public BigDecimal getTodayExpenseForCurrentUser() {
+        ProfileEntity profileEntity = profileService.getCurrentProfile();
+        LocalDate today = LocalDate.now(); // atau LocalDate.now(ZoneId.of("Asia/Jakarta")) jika perlu
+
+        BigDecimal sum = expenseRepository.findExpenseSumBetweenDates(
+                profileEntity.getId(),
+                today,
+                today);
+        return sum != null ? sum : BigDecimal.ZERO;
     }
 }
