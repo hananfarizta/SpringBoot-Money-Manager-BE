@@ -6,10 +6,11 @@ spring:
     import: optional:.env[.properties]
 
   profiles:
-    active: ${SPRING_PROFILES_ACTIVE}
+    active: ${SPRING_PROFILES_ACTIVE:local}
     group:
       local: [local]
       prod: [prod]
+      test: [test]
 
   jpa:
     hibernate:

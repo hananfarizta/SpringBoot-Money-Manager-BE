@@ -1,0 +1,143 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ "dev", "main" ]
+  pull_request:
+    branches: [ "dev", "main" ]
+  workflow_dispatch:
+
+jobs:
+  # =========================
+  # CI: Build & Test
+  # =========================
+  ci:
+    name: CI - Build & Test
+    runs-on: ubuntu-latest
+    env:
+      SPRING_PROFILES_ACTIVE: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java (Temurin 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Maven Clean
+        run: mvn -B clean
+
+      - name: Maven Verify (run tests + coverage)
+        run: mvn -B verify
+
+      - name: Compute safe artifact name
+        id: artifact_name
+        run: |
+          # Ambil ref name yang tepat: untuk PR pakai HEAD ref
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] && [ -n "${GITHUB_HEAD_REF}" ]; then
+            REF_NAME="${GITHUB_HEAD_REF}"
+          fi
+          # Lowercase + ganti karakter terlarang dengan '-'
+          SAFE_REF_NAME="$(echo "${REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[/:\"<>|*?\\]#-#g')"
+          echo "safe_ref_name=${SAFE_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload JAR artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moneymanager-jar-${{ steps.artifact_name.outputs.safe_ref_name }}
+          path: target/*.jar
+          if-no-files-found: warn
+
+  # =========================
+  # CD: Build Docker image (no tests) + optional push to GHCR
+  # =========================
+  cd-build:
+    name: CD - Docker Build
+    runs-on: ubuntu-latest
+    needs: [ ci ]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      JAVA_VERSION: "21"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java (Temurin 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: "maven"
+
+      - name: Maven Clean
+        run: mvn -B clean
+
+      - name: Build JAR (skip tests)
+        run: mvn -B package -DskipTests
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image name (lowercase) for branch
+        id: image_name
+        run: |
+          OWNER_LOWER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" | tr '[:upper:]' '[:lower:]')"
+          BRANCH="${GITHUB_REF##*/}"
+          if [ "$BRANCH" = "dev" ]; then
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-dev"
+          else
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-prod"
+          fi
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+
+      - name: Docker Build
+        run: |
+          docker build -t "${{ steps.image_name.outputs.image }}:latest" .
+          docker images "${{ steps.image_name.outputs.image }}:latest"
+
+  cd-push:
+    name: CD - Push to GHCR (conditional)
+    runs-on: ubuntu-latest
+    needs: [ cd-build ]
+    if: github.event_name != 'pull_request' && vars.PUSH_TO_GHCR == 'true'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute image name (lowercase) for branch
+        id: image_name
+        run: |
+          OWNER_LOWER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          REPO_LOWER="$(echo "${GITHUB_REPOSITORY#${GITHUB_REPOSITORY_OWNER}/}" | tr '[:upper:]' '[:lower:]')"
+          BRANCH="${GITHUB_REF##*/}"
+          if [ "$BRANCH" = "dev" ]; then
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-dev"
+          else
+            IMAGE="ghcr.io/${OWNER_LOWER}/${REPO_LOWER}/moneymanager-prod"
+          fi
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        run: |
+          docker images "${{ steps.image_name.outputs.image }}:latest" || echo "Image not present in this job runner."
+          # Build again here if needed because image may not persist across jobs; safer to rebuild quickly.
+          docker build -t "${{ steps.image_name.outputs.image }}:latest" .
+          docker push "${{ steps.image_name.outputs.image }}:latest"
