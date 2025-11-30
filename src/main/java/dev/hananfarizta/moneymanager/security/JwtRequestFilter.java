@@ -1,4 +1,4 @@
-package dev.hananfarizta.moneymanager.config;
+package dev.hananfarizta.moneymanager.security;
 
 import java.io.IOException;
 

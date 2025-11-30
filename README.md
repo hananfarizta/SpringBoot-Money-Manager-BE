@@ -1,6 +1,6 @@
 # Money Manager Backend
 
-A backend API for the Money Manager application, built using **Spring Boot 3**, **MySQL**, and **Docker**.
+A backend API for the Money Manager application, built using **Spring Boot 3**, **PostgreSQL**, **JWT**, and **Docker**, with CI/CD via GitHub Actions.
 
 ---
 
@@ -9,7 +9,10 @@ A backend API for the Money Manager application, built using **Spring Boot 3**, 
 - Income & Expense Management
 - Email Notification (Brevo SMTP)
 - Environment variable management using `.env`
-- Fully dockerized (Spring Boot + MySQL)
+- Fully dockerized (Spring Boot + PostgreSQL)
+- Config Profiles: local (default), test (CI), prod
+- Build: Maven 3.9+, JDK 21
+- CI/CD: GitHub Actions, GHCR (optional)
 
 ---
 
@@ -35,17 +38,40 @@ cd moneymanager
 
 ## ⚙️ 3. Setup Environment Variables
 ```bash
-SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/moneymanager
-MYSQL_USERNAME=root
-MYSQL_PASSWORD=yourpassword
+SPRING_DATASOURCE_URL_LOCAL=
+POSTGRES_USERNAME_LOCAL=
+POSTGRES_PASSWORD_LOCAL=
 
-SMTP_USERNAME=xxxx@smtp-brevo.com
-SMTP_PASSWORD=your-smtp-password
-SMTP_MAIL_FROM=your-email@gmail.com
+SPRING_PROFILES_ACTIVE=
 
-JWT_SECRET=your-jwt-secret-key
-FRONTEND_URL=http://localhost:5173
+PROD_DB_HOST=
+PROD_DB_PORT=
+PROD_DB_NAME=
+PROD_DB_USERNAME=
+PROD_DB_PASSWORD=
+
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_MAIL_FROM=
+
+JWT_SECRET=
+FRONTEND_URL=
+
+APP_ACTIVATION_URL=
 ```
+Notes:
+
+- Default profile is local. CI sets test automatically.
+
+- For Docker Compose, application connects to `moneymanager-db` (container DNS) on port 5432.
+
+Behavior:
+
+- `spring.profiles.active: ${SPRING_PROFILES_ACTIVE:local}`
+
+- Do NOT set `spring.profiles.active` inside `application-test.yml` (Spring Boot forbids it for profile-specific files).
 
 ---
 
@@ -64,7 +90,7 @@ docker ps
 
 ```bash
 moneymanager      Up   8080/tcp
-mysql_db          Up   3306/tcp
+postgres          Up   5432/tcp
 ```
 
 ---
@@ -80,15 +106,15 @@ Examples:
 
 ---
 
-## 🛢 6. Connect to MySQL via DBeaver / TablePlus
+## 🛢 6. Connect to PostgreSQL via DBeaver / TablePlus
 Use the following configuration:
 
 | Field     | Value                               |
 |-----------|--------------------------------------|
 | Host      | 127.0.0.1                            |
-| Port      | 3307                                 |
-| Username  | root                                 |
-| Password  | (value of `MYSQL_PASSWORD` in .env)  |
+| Port      | 5433                                 |
+| Username  | (value of `POSTGRES_USERNAME_LOCAL`) |
+| Password  | (value of `POSTGRES_PASSWORD_LOCAL`) |
 | Database  | moneymanager                         |
 | SSL       | Disabled                             |
 
@@ -97,38 +123,53 @@ Use the following configuration:
 ## 📚 7. Docker Compose Structure
 ```bash
 services:
-  app:
-    build: .
-    container_name: moneymanager
-    ports:
-      - "8080:8080"
-    depends_on:
-      - db
-    env_file:
-      - .env
+  db:
+    image: postgres:16-alpine
+    container_name: moneymanager-db
     environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${MYSQL_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      POSTGRES_DB: moneymanager
+      POSTGRES_USER: ${POSTGRES_USERNAME_LOCAL}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_LOCAL}
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d moneymanager"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moneymanager-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL_LOCAL}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USERNAME_LOCAL}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD_LOCAL}
+
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_MAIL_FROM: ${SMTP_MAIL_FROM}
+
       JWT_SECRET: ${JWT_SECRET}
       FRONTEND_URL: ${FRONTEND_URL}
-
-  db:
-    image: mysql:8.3
-    container_name: mysql_db
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: moneymanager
+      APP_ACTIVATION_URL: ${APP_ACTIVATION_URL}
     ports:
-      - "3307:3306"
-    volumes:
-      - mysqldata:/var/lib/mysql
+      - "8080:8080"
+    restart: unless-stopped
 
 volumes:
-  mysqldata:
+  db_data:
+
 ```
 
 ## ⚠️ 8. Useful Commands
@@ -172,3 +213,25 @@ spring.datasource.password=yourpassword
 ```bash
 mvn spring-boot:run
 ```
+
+- Testing
+
+  - Run all tests:
+    ```bash
+    mvn clean test
+    ```
+
+  - Run build + tests:
+    ```bash
+    mvn clean verify
+    ```
+
+Notes:
+
+- test profile uses H2 (in-memory) with ‎`ddl-auto=create-drop`.
+
+- Jackson JavaTimeModule is registered in controller tests for LocalDateTime.
+
+- Security tests use ‎`spring-security-test` (‎`@WithMockUser` for protected endpoints).
+
+- Repository slice tests (‎`@DataJpaTest`) run on H2 in CI.
