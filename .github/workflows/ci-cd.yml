@@ -9,7 +9,7 @@ on:
 
 jobs:
   # =========================
-  # CI: Build & Test + Reports
+  # CI: Build & Test
   # =========================
   ci:
     name: CI - Build & Test
@@ -33,12 +33,25 @@ jobs:
       - name: Maven Verify (run tests + coverage)
         run: mvn -B verify
 
+      - name: Compute safe artifact name
+        id: artifact_name
+        run: |
+          # Ambil ref name yang tepat: untuk PR pakai HEAD ref
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] && [ -n "${GITHUB_HEAD_REF}" ]; then
+            REF_NAME="${GITHUB_HEAD_REF}"
+          fi
+          # Lowercase + ganti karakter terlarang dengan '-'
+          SAFE_REF_NAME="$(echo "${REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[/:\"<>|*?\\]#-#g')"
+          echo "safe_ref_name=${SAFE_REF_NAME}" >> "$GITHUB_OUTPUT"
+
       - name: Upload JAR artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: moneymanager-jar-${{ github.ref_name }}
+          name: moneymanager-jar-${{ steps.artifact_name.outputs.safe_ref_name }}
           path: target/*.jar
+          if-no-files-found: warn
 
   # =========================
   # CD: Build Docker image (no tests) + optional push to GHCR
