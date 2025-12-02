@@ -115,7 +115,7 @@ class ProfileServiceTest {
             verify(emailService, times(1)).sendEmail(
                     eq("john.doe@example.com"),
                     eq("Activate Your Account"),
-                    contains("https://app.example.com/api/v1.0/activate?token=" + saved.getActivationToken()));
+                    contains("https://app.example.com/api/v1.0/auth/activate?token=" + saved.getActivationToken()));
 
             assertThat(result).containsKeys("user", "activationToken");
             ProfileDTO userDto = (ProfileDTO) result.get("user");
