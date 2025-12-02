@@ -45,7 +45,8 @@ public class ProfileService {
             newProfile.setActivationToken(UUID.randomUUID().toString());
             newProfile = profileRepository.save(newProfile);
 
-            String activationLink = appActivationUrl + "/api/v1.0/activate?token=" + newProfile.getActivationToken();
+            String activationLink = appActivationUrl + "/api/v1.0/auth/activate?token="
+                    + newProfile.getActivationToken();
             emailService.sendEmail(
                     newProfile.getEmail(),
                     "Activate Your Account",
